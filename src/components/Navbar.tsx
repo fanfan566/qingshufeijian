@@ -8,7 +8,8 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
-  Database
+  Database,
+  BookOpen
 } from 'lucide-react';
 import { PageType } from '../types';
 import { cn } from '../lib/utils';
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onPageChange }) => 
   const navItems = [
     { id: 'dashboard', label: '概览', icon: LayoutDashboard },
     { id: 'segmentation', label: '图像分割', icon: ImageIcon },
+    { id: 'knowledge', label: '医学知识库', icon: BookOpen },
     { id: 'graph', label: '知识图谱', icon: Network },
     { id: 'chat', label: '智能问答', icon: MessageSquare },
     { id: 'consultation', label: '咨询反馈', icon: MessagesSquare },

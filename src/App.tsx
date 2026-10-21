@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { WelcomePage } from './pages/WelcomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SegmentationPage } from './pages/SegmentationPage';
+import { KnowledgeLibraryPage } from './pages/KnowledgeLibraryPage';
 import { KnowledgeGraphPage } from './pages/KnowledgeGraphPage';
 import { ChatPage } from './pages/ChatPage';
 import { PlansPage } from './pages/PlansPage';
@@ -24,6 +25,8 @@ export default function App() {
         return <DashboardPage onNavigate={setCurrentPage} />;
       case 'segmentation':
         return <SegmentationPage />;
+      case 'knowledge':
+        return <KnowledgeLibraryPage />;
       case 'graph':
         return <KnowledgeGraphPage />;
       case 'chat':

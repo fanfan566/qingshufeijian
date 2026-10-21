@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Image as ImageIcon, Scan, FileText,
   CheckCircle2, Loader2, Sparkles, Activity,
-  FileDown, Printer, RefreshCcw, Search, AlertCircle, Layers3, Eye, EyeOff, ShieldAlert, FolderOpen
+  FileDown, Printer, RefreshCcw, Search, AlertCircle, Layers3, Eye, EyeOff, ShieldAlert, FolderOpen, Maximize2
 } from 'lucide-react';
+import { ImageViewer } from '../components/ImageViewer';
+import { RelatedKnowledge } from '../components/RelatedKnowledge';
 import { cn } from '../lib/utils';
 import {
   analyzeSegmentationLungmask,
@@ -277,6 +279,19 @@ export const SegmentationPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
+  const attachCanvas = useCallback((element: HTMLCanvasElement | null) => {
+    canvasRef.current = element;
+    setCanvasElement(element);
+  }, []);
+  const [imageViewer, setImageViewer] = useState<{ src: string; title: string } | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [canvasError, setCanvasError] = useState(false);
+  const knowledgeFindings = useMemo(() => [
+    ...(segmentationResult ? [{ id: '肺部分割', label_code: 'LUNG_ANATOMY' }] : []),
+    ...nodules.map((nodule, index) => ({ id: `结节 #${index + 1}`, type: nodule.type, label_code: nodule.label_code, signs: nodule.signs })),
+    ...lesions.map((lesion, index) => ({ id: `病变 #${index + 1}`, name: lesion.name, label_code: lesion.label_code, signs: lesion.signs })),
+  ], [segmentationResult, nodules, lesions]);
 
   const resetAnalysisStates = () => {
     setSegmentedImage(null);
@@ -515,6 +530,7 @@ export const SegmentationPage: React.FC = () => {
     setUploadMode('image');
     setPreview(null);
     resetAnalysisStates();
+    setImageViewer(null);
   };
 
   const validation = segmentationResult?.stats?.validation;
@@ -667,9 +683,11 @@ export const SegmentationPage: React.FC = () => {
   }, [preview]);
 
   useEffect(() => {
-    if (!canvasRef.current || !activeSegmentationImage) return;
+    setCanvasReady(false);
+    setCanvasError(false);
+    if (!canvasElement || !activeSegmentationImage) return;
 
-    const canvas = canvasRef.current;
+    const canvas = canvasElement;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -699,7 +717,6 @@ export const SegmentationPage: React.FC = () => {
     };
 
     const img = new Image();
-    img.src = activeSegmentationImage;
     img.onload = () => {
       try {
         canvas.width = img.width;
@@ -717,8 +734,8 @@ export const SegmentationPage: React.FC = () => {
           }
         }
 
-        // 始终绘制结节标记，无论选择哪个图层
-        if (showBoundary && nodules.length > 0) {
+        // 三联图拥有独立布局，不能套用单张影像的结节坐标。
+        if (showBoundary && nodules.length > 0 && selectedLayer !== 'comparison') {
           console.log('准备绘制结节标记:', nodules.length, '个结节');
           console.log('结节数据:', nodules);
           console.log('图像尺寸:', img.width, 'x', img.height);
@@ -730,14 +747,20 @@ export const SegmentationPage: React.FC = () => {
         } else {
           console.log('未绘制结节标记:', { showBoundary, nodulesLength: nodules.length });
         }
+        setCanvasReady(true);
       } catch (error) {
+        setCanvasError(true);
         console.error('绘制过程中出错:', error);
       }
     };
-  }, [activeSegmentationImage, nodules, selectedLayer, showBoundary, splitStatsUnavailable]);
+    img.onerror = () => setCanvasError(true);
+    img.src = activeSegmentationImage;
+    return () => { img.onload = null; img.onerror = null; };
+  }, [activeSegmentationImage, canvasElement, isProcessing, nodules, selectedLayer, showBoundary, splitStatsUnavailable]);
 
   return (
     <div className="min-h-screen bg-brand-bg p-10 relative">
+      {imageViewer && <ImageViewer {...imageViewer} onClose={() => setImageViewer(null)} />}
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex items-end justify-between">
           <div className="space-y-2">
@@ -1129,13 +1152,16 @@ export const SegmentationPage: React.FC = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full h-full p-4"
                   >
-                    <div className="space-y-3">
+                    <div className="min-w-0 space-y-3">
                       <div className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">
                         {uploadMode === 'image' ? '原始影像' : '输入信息'}
                       </div>
                       <div className="rounded-[24px] overflow-hidden shadow-xl border-2 border-white h-[500px] bg-black/5">
                         {uploadMode === 'image' && preview ? (
-                          <img src={preview} alt="Original" className="w-full h-full object-cover" />
+                          <button type="button" aria-label="放大查看原始影像" onClick={() => setImageViewer({ src: preview, title: '原始影像' })} className="group flex h-full w-full flex-col items-center bg-slate-950">
+                            <img src={preview} alt="原始影像" className="min-h-0 w-full flex-1 object-contain" />
+                            <span className="flex shrink-0 items-center gap-2 py-3 text-xs font-bold text-white"><Maximize2 size={14} />放大查看原始影像</span>
+                          </button>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-center px-8">
                             <div className="w-20 h-20 rounded-[24px] bg-night-royal/10 text-night-royal flex items-center justify-center">
@@ -1156,7 +1182,7 @@ export const SegmentationPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="min-w-0 space-y-3">
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-2">
                         <div className="text-xs font-black text-night-royal uppercase tracking-widest">分割可视化结果</div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -1211,10 +1237,8 @@ export const SegmentationPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="rounded-[24px] overflow-hidden shadow-xl border-2 border-night-royal/20 h-[500px] relative bg-black/5">
-                        <canvas ref={canvasRef} className="w-full h-full object-cover" />
-
-                        <div className="absolute top-4 left-4 flex flex-col gap-2 max-w-[88%]">
+                      <div className="rounded-[24px] overflow-hidden shadow-xl border-2 border-night-royal/20 bg-white/70">
+                        <div className="flex flex-col gap-2 p-4">
                           <div className="glass-card px-3 py-2 rounded-xl text-[10px] font-bold text-night-deep flex items-center gap-1">
                             <Layers3 size={12} />
                             <span>
@@ -1252,7 +1276,13 @@ export const SegmentationPage: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="absolute bottom-4 left-4 right-4 space-y-2">
+                        <button type="button" disabled={!canvasReady} aria-label="放大查看当前结果图" onClick={() => {
+                          if (canvasRef.current && canvasReady) setImageViewer({ src: canvasRef.current.toDataURL('image/png'), title: '分割结果 · ' + ({ original: '原图', overlay: 'AI 叠加图', mask: '纯掩膜图', comparison: '三联对比图' }[selectedLayer]) });
+                        }} className="block w-full bg-slate-950 text-white disabled:cursor-wait">
+                          <canvas ref={attachCanvas} role="img" aria-label="完整分割结果图" className="block h-auto w-full" />
+                          <span className="flex items-center justify-center gap-2 px-4 py-3 text-xs font-bold"><Maximize2 size={14} />{canvasError ? '结果图加载失败，请切换图层重试' : canvasReady ? '放大查看 · 完整图像' : '正在加载图像…'}</span>
+                        </button>
+                        <div className="space-y-2 p-4">
                           <div className="glass-card p-3 rounded-xl">
                             <div className="text-xs font-bold text-night-deep">
                               {nodules.length === 0 ? '当前未检出明确结节，可继续结合其他病灶识别与报告结论综合判断。' : noduleSummary.headline}
@@ -1323,6 +1353,8 @@ export const SegmentationPage: React.FC = () => {
                 )}
               </AnimatePresence>
             </div>
+
+            {segmentationResult && !isProcessing && <RelatedKnowledge findings={knowledgeFindings} />}
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}

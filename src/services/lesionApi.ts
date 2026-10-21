@@ -5,6 +5,8 @@ import { apiRequest, type ApiResponse } from './apiService';
 import { API_ENDPOINTS } from '../config/api';
 
 export interface LesionInfo {
+  label_code?: string;
+  signs?: string[];
   name: string;
   confidence: number;
   severity: '轻度' | '中度' | '重度';

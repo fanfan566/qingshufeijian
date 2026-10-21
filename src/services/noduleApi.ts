@@ -5,6 +5,8 @@ import { apiRequest, type ApiResponse } from './apiService';
 import { API_ENDPOINTS } from '../config/api';
 
 export interface NoduleInfo {
+  label_code?: string;
+  signs?: string[];
   id: number;
   x: number;
   y: number;

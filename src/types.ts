@@ -24,4 +24,4 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type PageType = 'welcome' | 'dashboard' | 'segmentation' | 'graph' | 'chat' | 'consultation' | 'plans' | 'crawler';
+export type PageType = 'welcome' | 'dashboard' | 'segmentation' | 'graph' | 'knowledge' | 'chat' | 'consultation' | 'plans' | 'crawler';
