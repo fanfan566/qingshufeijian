@@ -1,0 +1,170 @@
+审阅结论（基于已读 segment_lungmask_full.py，不改代码）
+
+一、最该优先改的函数
+1._extract_left_right_lungs
+- 现状问题：
+  - 虽然已经不再“硬切 top-2”，但核心仍是用组件质心 cx 与图像中线 mid_x 比较来判左右。
+  - 对截图模式尤其不稳：只要 CT ROI 有水平偏移、身体不居中、整张截图被裁左/裁右、或者某一肺被误连到纵隔，左右判定就容易错。
+  - 当一侧没有组件时，fallback 直接取面积最大的两个组件再按 x 排序，仍可能把碎片/背景误当另一侧肺。
+- 建议怎么改：
+  - 左右划分基准不要直接用整幅图 mid_x，至少应先基于 body_mask 或 merged lung bbox 估计“身体中心线/胸腔中心线”。
+  - 更稳的做法：先对 merged_mask 做距离变换或纵向投影，找到胸骨/纵隔对应的低谷带，再作为左右分界；若做不到，至少用 body_mask 的 x_min/x_max 中心，而不是整图中心。
+  - 增加“跨中线连桥断开”处理：对过宽的单连通域，先按中线附近窄桥腐蚀/开运算，再重新做连通域，可明显改善双肺粘连时的左右误判。
+  - fallback 不应“只要两个最大组件就分左右”，应增加约束：组件中心必须分别位于中心线两侧、面积占比不能过小、纵向位置需接近。
+
+2._detect_crop_and_offset
+- 现状问题：
+  - 只看 mask 是否触边，以及 bbox 是否接近边缘；但截图模式下很多误差发生在 ROI 已经被 _detect_ct_region 裁过之后，触边不一定代表真的裁切。
+  - 相反，如果 _detect_ct_region 本身裁掉了一部分肺，后面 mask 可能不触原图边缘，仍然漏判。
+- 建议怎么改：
+  - 触边判断应同时区分“原图边缘”和“ROI 边缘”。现在只对最终 merged_mask 做判断，不足以识别 ROI 裁切带来的偏差。
+  - 建议把 ct_roi 的 offset_x、offset_y、roi_w、roi_h 一并进入校验；若 ROI bbox 紧贴原图某边，且肺掩码又贴 ROI 边，则高度怀疑截图裁切。
+  - ratio_reliable 现在过于二元，建议改成分级：true / limited / false，或者至少增加独立分数字段，避免前端只能看到硬性失败。
+
+3._detect_ct_region
+- 现状问题：
+  - 二值条件 (img>8)&(img<245) 太粗，容易把界面文字、灰底、标尺、截图阴影一起吞进 ROI。
+  - 只取最大轮廓 boundingRect，遇到多面板截图、带工具栏、带黑边时很容易裁错大框。
+  - 用 boundingRect 后再简单 pad_x/pad_y 收缩，缺少对“近正方形 CT 面板/近中心区域”的偏好。
+- 建议怎么改：
+  - 候选轮廓筛选除面积外，应增加：中心性、长宽比、填充率、灰度分布稳定性。
+  - 如果存在多个大候选，优先选择“中心更接近全图中心、内部灰度动态范围更像 CT、接近单个面板比例”的区域，而不是纯最大面积。
+  - 对截图模式建议返回更多调试信息：roi_bbox、roi_area_ratio、roi_from_screenshot=true，便于前端或日志定位问题。
+
+4._segment_ct_body
+- 现状问题：
+  - 整体仍是“暗区即肺”的启发式：按 p10/p35/p50 定阈值，再做形态学和连通域筛选。
+  - 对普通截图/窗宽窗位变化/有文字水印时，阈值很容易漂。
+  - “每侧只保留 score 最优一个 contour” 偏激，真实截图里一侧肺被血管或噪声分裂成两个区域时，会被截断。
+- 建议怎么改：
+  - 不要每侧只保留一个 contour，应保留同侧多个满足条件、且与主肺区域相邻/接近的组件，然后合并。
+  - 当前 extent/aspect/center_distance 是固定硬阈值，建议和 body bbox 尺寸关联，至少按截图大小自适应。
+  - 增加“孔洞填充后再分裂”和“同侧近邻组件合并”步骤，减少单肺被打碎后面积异常偏小的问题。
+  - 现有 body_mask 与 effective_mask 相交是对的，但 analysis_mask 过严时会吞掉贴边肺尖；建议在上部和外侧留一定安全边界，不要只靠最终边缘切除。
+
+5.validate_segmentation_result
+- 现状问题：
+  - 规则过于依赖左右面积比例和肺野占比，对截图模式不够稳。
+  - 既用了 effective_area 比例，又用了 total_pixels 比例，又用了 mm² 估计，但 image 模式 pixel_spacing_mm 是 350/宽 的估算值，mm² 判断意义很弱。
+- 建议怎么改：
+  - image 模式下弱化或取消 mm² 范围校验（2000~120000），因为这是伪物理尺度，误导大于帮助。
+  - 左右比 left/right <0.5 或 >1.5 直接 forced_fail 太激进，尤其单张截图、纵隔偏移、心影较大时容易误伤。建议改为：
+    - 先 warning；
+    - 只有同时伴随单侧缺失、触边、碎片过多、面积占比异常时再 fail。
+  - lung_effective_ratio 的 0.18 / 0.82 过硬，截图模式下 0.82 几乎只在严重误分割才会出现，但 0.18 对小 ROI、局部截图可能偏严。建议 image 模式与 dicom 模式分开阈值。
+  - passed 现在受 len(warnings)<=2 限制，属于“警告个数驱动”，不够合理。更建议按严重/轻度警告分层，不要因为多个轻度 warning 直接 fail。
+
+二、截图模式下左右肺判定的明显缺陷
+1. 左右判定仍基于像素空间，而不是稳定的身体中心
+- 对 DICOM 已做 LPS 归一化，这是优点；
+- 但 /image 模式没有患者方向信息，只能靠图像内容，当前直接 mid_x 分割太脆弱。
+
+2. ROI 检出与左右判定脱节
+- _detect_ct_region 先裁 ROI，但 _extract_left_right_lungs 并不知道这个 ROI 是否偏左/偏右、是否已经截掉一部分胸腔。
+- 导致“裁切造成的偏移”被当成“左右面积异常”。
+
+3. 单连通域跨中线时没有真正拆分
+- 当前只是按连通域质心分左右；若左右肺被连成一个块，该块只会落到一侧，另一侧直接缺失。
+
+三、掩码生成上的明显缺陷
+1. /image fallback 依赖 skimage.threshold_otsu
+- 代码里直接 from skimage.filters import threshold_otsu，但项目上下文未确认有 skimage，这本身就是部署风险。
+- 即便运行环境有，和主文件其他部分“尽量不引新依赖”的风格也不一致。
+- 如果后续要改，建议用 cv2.threshold + OTSU 替代。
+
+2. _segment_ct_body 的“暗区阈值=肺”策略误报来源仍大
+- 黑边、体外空气、机床空腔、文字阴影都可能进候选。
+- 目前虽然叠加了 body_mask，但 body_mask 本身是 >20 & <245，也容易把非身体区域一起纳入。
+
+3. 每侧只取一个最佳 contour 容易漏肺
+- 这是当前最直接的漏分割来源之一，特别是上肺尖、下肺底被切碎时。
+
+四、异常判断/状态判定的明显问题
+1._get_lung_status 阈值不合理且过死
+- 左肺正常 35-50%，右肺正常 50-65%：
+  - 这实际上把“右肺天然略大”固定成非常窄的范围；
+  - 但单层切片中左右比例随层面变化很大，不适合作为强异常依据。
+- 当前 _build_segmentation_response 中只要任一 status != normal 就 validation["passed"]=False，过严。
+- 建议：
+  - 这些 status 只能作提示，不应直接导致失败；
+  - 阈值应按“所选层类型”放宽，尤其 auto-selected 单层展示层，本就不是严格解剖定量层。
+
+2. left_right_ratio 二次强制失败重复处罚
+- validate_segmentation_result 已判断一次；
+- _build_segmentation_response 又用 0.55/1.45 再强制失败一次，逻辑重复且更严。
+- 建议统一到一个地方处理，减少双重惩罚。
+
+3. suspected_issue_regions 有些标记过粗
+- 如 additional_fragmented_regions_detected、left_lung_ratio_abnormal 等会频繁出现；
+- 但前端若直接展示，用户会觉得“系统报很多异常”，可读性不佳。
+- 建议区分：
+  - technical_issues（裁切、碎片、单侧缺失）
+  - anatomical_warnings（左右比例偏差）
+  - 这样前端更容易解释。
+
+五、最明显有问题的阈值/策略
+1._detect_ct_region
+- min_area = h*w*0.08：对大截图可能太低，UI 大面板也会入选。
+- binary 条件 >8 and <245：过宽。
+
+2._create_body_region_mask
+- body_candidate: (blurred >20) & (blurred <245) 过于宽松，截图里大量非身体区域会满足。
+- min_area = 10% 全图面积：多面板截图时仍可能选错。
+
+3._segment_ct_body
+- thresh_val 限制在 8~110：对增强截图/亮度被拉伸后的 JPG 不稳。
+- cy > h*0.82、aspect 0.45~3.2、extent >0.18、center_distance <0.95：都偏经验值，且未区分 ROI 模式与整图模式。
+- backup item["area"] <= body_area*0.35：缺少位置约束，容易把非肺区补进去。
+
+4.validate_segmentation_result
+- lung_effective_ratio <0.18 / >0.82；
+- left/right <0.5 或 >1.5 forced_fail；
+- 单肺 min_px = total_pixels*0.015；
+- mm² 范围 2000~120000；
+这些在 image 模式都偏生硬。
+
+5._get_lung_status
+- 左肺 35~50、右肺 50~65 用于单层截图过严。
+
+六、前端联动字段可增强的点（不破坏现有结构前提下）
+建议在 data 或 stats 下增加可选字段，前端可渐进使用，不影响旧类型读取：
+1. stats 下可增强
+- roi_detected: bool
+- roi_bbox: [x1,y1,x2,y2]
+- body_bbox: [x1,y1,x2,y2]
+- mask_bbox: [x1,y1,x2,y2]
+- left_lung_pixels / right_lung_pixels / total_lung_pixels
+- confidence_breakdown: {area_ratio, lr_balance, crop_penalty, fragmentation_penalty}
+- validation_level: pass / warning / fail
+
+2. suspected_issue_regions 可补充更细标签
+- roi_left_crop / roi_right_crop / roi_top_crop / roi_bottom_crop
+- lungs_connected_across_midline
+- low_body_confidence
+- screenshot_mode_detected
+
+3. 便于前端解释的文本字段
+- quality_summary：一句话总结，如“检测到截图裁切，左右肺比例仅供参考”
+- analysis_mode：dicom_3d / image_screenshot / image_fullframe
+- left_right_basis：midline / body_center / roi_center
+这样前端可以解释“为什么结果不可靠”。
+
+七、精炼优先级建议
+P1
+- _extract_left_right_lungs：改左右划分依据 + 处理跨中线粘连
+- _segment_ct_body：改成同侧多组件保留与合并
+- _detect_ct_region：提高截图 ROI 检出稳定性
+
+P2
+- validate_segmentation_result：降低 image 模式误杀，减少重复 fail
+- _get_lung_status：只保留提示作用，不直接决定通过失败
+- _detect_crop_and_offset：把 ROI 裁切信息纳入可靠性判断
+
+P3
+- /image fallback 去掉 skimage 依赖
+- 增加前端可消费的 roi/quality 解释字段
+
+总体判断
+- DICOM 路径整体明显比截图路径稳，尤其方向归一化、最佳切片选择做得不错。
+- 主要短板集中在 /image 截图模式：ROI 检出、左右肺拆分、规则校验过严且重复。
+- 当前最容易造成用户感知问题的不是“分不出来”，而是“分出来但左右标反/单侧缺失/明明看着还行却被判失败”。

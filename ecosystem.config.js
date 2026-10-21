@@ -1,0 +1,40 @@
+module.exports = {
+  apps: [
+    {
+      name: 'lung-ct-backend',
+      script: 'server.js',
+      cwd: '/home/lung-ct-system/Lang-Protector-main',
+      instances: 2,
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 8000,
+      },
+      error_file: '/home/lung-ct-system/logs/backend-error.log',
+      out_file: '/home/lung-ct-system/logs/backend-out.log',
+      log_file: '/home/lung-ct-system/logs/backend-combined.log',
+      time: true,
+      autorestart: true,
+      max_memory_restart: '1G',
+      watch: false,
+    },
+    {
+      name: 'lung-ct-frontend',
+      script: 'npm',
+      cwd: '/home/lung-ct-system/Lang-Protector-main',
+      args: 'run dev',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 5173,
+        HOST: '0.0.0.0',
+      },
+      error_file: '/home/lung-ct-system/logs/frontend-error.log',
+      out_file: '/home/lung-ct-system/logs/frontend-out.log',
+      log_file: '/home/lung-ct-system/logs/frontend-combined.log',
+      time: true,
+      autorestart: true,
+      max_memory_restart: '512M',
+      watch: false,
+    },
+  ],
+};

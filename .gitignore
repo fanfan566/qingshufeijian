@@ -1,0 +1,52 @@
+# 依赖
+node_modules/
+
+# 构建产物
+build/
+dist/
+coverage/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+
+# 环境配置
+.env*
+!.env.example
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 临时文件
+temp/
+tmp/
+*.tmp
+
+# 测试数据
+test_images/
+test_*.py
+test_*.html
+generate_test_*.py
+
+# IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 爬虫缓存
+data/crawler/*.json
+
+# 模型权重（避免提交大文件）
+*.pth
+ai_models/trained_models/
+backend/data/models/
+data/models/

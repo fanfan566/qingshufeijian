@@ -1,0 +1,37 @@
+# AI 模型服务依赖安装说明
+
+## 方法 1：使用 requirements.txt（推荐）
+
+```bash
+pip install -r requirements.txt
+```
+
+## 方法 2：手动安装
+
+```bash
+pip install fastapi uvicorn python-multipart opencv-python numpy pillow
+```
+
+## 可选：深度学习支持（GPU 加速）
+
+如果需要更精确的 AI 模型，安装以下依赖：
+
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+## 验证安装
+
+```bash
+python -c "import cv2, torch; print('OpenCV:', cv2.__version__); print('PyTorch:', torch.__version__)"
+```
+
+## 启动 AI 服务
+
+```bash
+cd ai_models
+python image_processor.py
+```
+
+服务将在 http://localhost:8001 启动
+API 文档：http://localhost:8001/docs
