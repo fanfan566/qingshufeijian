@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { KNOWLEDGE_CATEGORIES, medicalKnowledge, searchKnowledge, matchKnowledge } from '../src/data/medicalKnowledge';
+import { CORE_KNOWLEDGE_CATEGORIES, medicalKnowledge, searchKnowledge, matchKnowledge } from '../src/data/medicalKnowledge';
 
 test('all four categories have complete sourced entries with unique stable codes', () => {
   assert.equal(new Set(medicalKnowledge.map(entry => entry.code)).size, medicalKnowledge.length);
-  for (const category of KNOWLEDGE_CATEGORIES) assert.ok(medicalKnowledge.some(entry => entry.category === category));
+  for (const category of CORE_KNOWLEDGE_CATEGORIES) assert.ok(medicalKnowledge.some(entry => entry.category === category));
   for (const entry of medicalKnowledge) {
     for (const field of ['name', 'brief', 'feature', 'risk', 'follow', 'differential'] as const) assert.ok(entry[field].trim(), `${entry.code}.${field}`);
     assert.ok(entry.references.length);

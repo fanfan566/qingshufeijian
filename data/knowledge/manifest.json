@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "sources": {
+    "hpo": {
+      "name": "Human Phenotype Ontology (HPO)",
+      "version": "2026-09-01",
+      "url": "https://github.com/obophenotype/human-phenotype-ontology",
+      "license": "HPO License",
+      "licenseUrl": "https://hpo.jax.org/app/license",
+      "translation": "HPO Chinese Language Working Group / Chinese HPO consortium",
+      "translationUrl": "https://github.com/obophenotype/hpo-translations/blob/cd44f61b40f7728ea1b6a09e74d9fbca1187f17f/docs/translations/zh.md"
+    },
+    "mondo": {
+      "name": "Mondo Disease Ontology",
+      "version": "2026-10-06",
+      "url": "https://github.com/monarch-initiative/mondo",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  },
+  "inputs": {
+    "hp": {
+      "url": "https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/920d4eb3608b50a2c19ddb10290224ab35a759c5/hp.obo",
+      "sha256": "93dace952fcb3ec4728818857f6ba76bc2d5312f4d83266519b8694b8e798f22"
+    },
+    "mondo": {
+      "url": "https://github.com/monarch-initiative/mondo/releases/download/v2026-10-06/mondo.obo",
+      "sha256": "2631e8e165d41def1a46749adb1ce0a336c8aba7f6bc0978729592cee8fed60b"
+    },
+    "hp-zh.tsv": {
+      "url": "https://raw.githubusercontent.com/obophenotype/hpo-translations/cd44f61b40f7728ea1b6a09e74d9fbca1187f17f/babelon/hp-zh.babelon.tsv",
+      "sha256": "64a30d5f065e1180fa6a30c192dd84aa403cd1b44f2b24ee883fcde948b1ca53"
+    }
+  },
+  "importedCount": 33093,
+  "chineseLabelCount": 15182,
+  "respiratoryCount": 1429,
+  "categoryCounts": {
+    "症状与体征": 16733,
+    "疾病术语": 16360
+  }
+}

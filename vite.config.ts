@@ -31,6 +31,10 @@ export default defineConfig(({mode}) => {
       port: 5173,
       strictPort: false,
       proxy: {
+        '/api/knowledge': {
+          target: 'http://localhost:8001',
+          changeOrigin: true,
+        },
         // Auth/chat/recommendations → Node.js server (port 8001)
         '/api/auth': {
           target: 'http://localhost:8001',

@@ -10,6 +10,7 @@ import { spawn } from 'child_process';
 import multer from 'multer';
 import { healthCrawler } from './crawler/index.js';
 import { scheduler } from './crawler/scheduler.js';
+import { createKnowledgeRouter } from './server/routes/knowledge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +23,7 @@ const PORT = 8001;
 // 中间件
 app.use(cors());
 app.use(express.json());
+app.use('/api/knowledge', createKnowledgeRouter());
 
 // Multer 文件上传配置
 const storage = multer.diskStorage({

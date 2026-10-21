@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { categoryStyles } from '../data/knowledgeCategories';
+import { cn } from '../lib/utils';
 import { BookOpen } from 'lucide-react';
 import { matchKnowledge, type KnowledgeEntry, type KnowledgeFinding } from '../data/medicalKnowledge';
 import { KnowledgeDetail, KnowledgeDisclaimer } from './KnowledgeDetail';
@@ -14,6 +16,7 @@ export function RelatedKnowledge({ findings }: { findings: KnowledgeFinding[] })
         {matches.map(({ finding, entries }) => entries.length ? entries.map(entry =>
           <button key={`${finding.id}-${entry.code}`} title={entry.brief} onClick={() => setSelected(entry)} className="rounded-2xl border border-purple-100 bg-white/80 p-4 text-left transition hover:border-night-lavender">
             <span className="text-[11px] font-bold text-night-lavender">{finding.id}</span>
+            <span className={cn('ml-2 rounded-full border px-2 py-1 text-[10px] font-bold', categoryStyles[entry.category].badge)}>{entry.category}</span>
             <h4 className="my-2 text-sm font-black text-night-deep">{entry.name}</h4>
             <p className="text-xs leading-6 text-slate-500">{entry.brief}</p>
             <span className="mt-3 block text-xs font-bold text-night-royal">查看详情 →</span>
